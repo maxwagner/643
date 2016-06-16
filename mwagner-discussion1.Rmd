@@ -1,0 +1,44 @@
+---
+title: "Discussion 1"
+author: "Max Wagner"
+date: "June 10, 2016"
+header-includes:
+   - \usepackage{bbm}
+output:
+  pdf_document: default
+  html_document:
+    highlight: espresso
+    theme: flatly
+  word_document: default
+---
+***
+
+#What Should I Read Next
+
+[whatshouldireadnext.com](whatshouldireadnext.com) is a simple interface site where you enter a book title, author, or a list of books, and it recommends other books that you may enjoy. Very little fuss. An important aspect of the site is joining so you are able to save a list of books you have read/liked, so that the system is able to recommend based on more than one or two titles.
+
+### Who are your target users?
+
+In most cases, the target users would be anyone who both reads and wants to find similar books to what they have already read.
+
+### What are their key goals?
+
+To recommend a book to you that you will enjoy, and refer you to a place where you can buy it. 
+
+### How can you help them accomplish those goals?
+
+Accomplishing the goal is similar to the goal itself in this case. The benefit of this site in particular is the lack of commerical gain by recommending certain books. The books are catered to interests, not what you buy.
+
+***
+
+### Reverse Engineering
+
+WSIRN works by what they call "collective taste," more specificly a collaborative filtering system they wrote themselves called "Incidence Bias Weighting." 
+
+Everytime a person enters a list, those books gain an association with each other. The more associations, the more likely they are to appear on each other's lists. It's a simple system driven nearly completely by user input.
+
+***
+
+### Improvements
+
+A lack of a rating system is definitely a flaw on the site. It considers every item on your list to be of equal weight. If you were able to give one book a 5, and another a 4, it would probably give more precise readouts. This would also add the ability to filter out books you don't like, even when other people like both. 
