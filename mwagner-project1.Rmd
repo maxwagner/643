@@ -1,0 +1,121 @@
+---
+title: "Project 1"
+author: "Max Wagner"
+date: "June 10, 2016"
+header-includes:
+   - \usepackage{bbm}
+output:
+  pdf_document: default
+  html_document:
+    highlight: espresso
+    theme: flatly
+  word_document: default
+---
+***
+
+## Data
+
+The data was generated in excel. It is similar to the data from class on the movie rating, but with 26 imaginary people, and 10 movies. It uses a similar 1-5 scale, with 0 representing a movie that they have not seen. In this case, the idea of the recommendation system would be to recommend the best movies to someone. The main method will be collabortative filtering.
+
+The head of the csv file can be seen below:
+
+```{r}
+movies <- read.csv('movies.csv', stringsAsFactors = FALSE)
+users <- movies[,1]
+movies <- movies[,2:11]
+movie.names <- colnames(movies)
+head(movies)
+```
+
+A mean centered preview for movies can be seen below. This section also gets the mean centered information for users if we need to compare users later.
+
+```{r}
+users.avg <- rowMeans(movies, na.rm = TRUE)
+users.avg.total <- mean(users.avg)
+movies.avg <- colMeans(movies, na.rm = TRUE)
+movies.avg.total <- mean(movies.avg)
+
+users.mean.centered <- round(movies[] - users.avg,2)
+movies.mean.centered <- round(movies[] - movies.avg,2)
+head(movies.mean.centered)
+```
+
+## Movie CF
+
+Calculating the similarity matrix by hand using cosines.
+
+```{r}
+# Calculating cosines fxn
+gcos <- function(a,b) {
+  return(sum(a*b) / (sqrt(sum(a^2)) * sqrt(sum(b^2))))
+}
+
+#10x10 matrix for the 10 movies
+movie.simi <- matrix(NA, nrow = length(movie.names), ncol = length(movie.names), dimnames = list(colnames(movie.names), rownames(movie.names)))
+
+for(i in 1:ncol(movies.mean.centered)) {
+  for(j in 1:ncol(movies.mean.centered)) {
+    movie.simi[i,j] <- gcos(movies.mean.centered[i],movies.mean.centered[j])
+  }
+}
+
+movie.simi <- data.frame(movie.simi)
+colnames(movie.simi) <- movie.names
+rownames(movie.simi) <- movie.names
+```
+
+The similarity matrix looks good, it has 1's on the diagonal with numbers ranging from -1 to 1. From here some recommendations can be found. Let's find the most recommended movies to watch for each movie in decreasing order.
+
+```{r}
+# another placeholder, make sure to drop 1st as it will be the same movie with a 1.00
+movie.recs <- data.frame(matrix(NA, nrow = 10, ncol = 10))
+
+#loop to order the similarites in each row
+for(i in 1:ncol(movie.simi)) {
+   movie.recs[i,] <- colnames(movie.simi[i,order(movie.simi[i,],decreasing = TRUE)])
+}
+
+#get rid for first col
+movie.recs <- movie.recs[,-1]
+colnames(movie.recs) <- paste("rec",1:9)
+rownames(movie.recs) <- paste("movie", 1:10)
+movie.recs
+```
+
+Above we can see all 10 movies, and then 9 recommendations in the order of similarity.
+
+## R Packages
+
+I'll use 'recommenderlab' to get a few different types of read outs.
+
+```{r,warning=FALSE,message=FALSE}
+library(recommenderlab)
+movies <- read.csv('movies.csv', stringsAsFactors = FALSE)
+movies[movies==0] <- NA
+movies <- as.matrix(movies[,2:11])
+
+#make it a rating matrix
+movies.rm <- as(movies, "realRatingMatrix")
+
+#normalize it, should do this automatically in Recommender as well
+movies.rmn <- normalize(movies.rm)
+
+#graph it
+plot(image(movies.rmn, main = "Normalized Rating"))
+
+#create a recommender for what the users should see next
+movies.recom <- Recommender(movies.rm[1:20], method = "UBCF")
+movies.predict <- predict(movies.recom, movies.rm[21:26],n=9)
+as(movies.predict, "list")
+```
+
+The above list turned out slightly differently than I had predicted at first, but it made sense when I realized it was recommending users to see the movies they had no seen yet. In the case of users that had seen all the movies, it had no recommendations for them.
+
+We can then try to predict ratings for users.
+
+```{r}
+movies.predict2 <- predict(movies.recom, movies.rm[21:26], type = "ratingMatrix")
+as(movies.predict2, "list")
+```
+
+The outcome of testing the "by hand" method versus using a package leads me to believe that using a pre-built package will be best for anything that you are not able to easily check by hand. The example I used was fairly small and I can eye results to see if they made sense. When the data set becomes significantly larger, it will be nearly impossible to check results to see if your by hand method works correctly. The inclusion of NA values also makes the pre-build package more appealing.
