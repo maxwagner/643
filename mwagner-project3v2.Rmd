@@ -1,0 +1,160 @@
+---
+title: "Project 3"
+author: "Max Wagner"
+date: "June 25, 2016"
+header-includes:
+   - \usepackage{bbm}
+output:
+  pdf_document: default
+  html_document:
+    highlight: espresso
+    theme: flatly
+  word_document: default
+---
+***
+
+```{r,message=FALSE, warning=FALSE}
+library(reshape2)
+library(dplyr)
+library(recommenderlab)
+library(NMF)
+library(ggplot2)
+```
+
+## Data
+
+The first step is to load in the data from the small data set, and remove anything we don't need. In this case, the time the rating was made. 
+
+```{r}
+movies <- read.csv("https://raw.githubusercontent.com/maxwagner/643/master/ml-latest-small/movies.csv", 
+                   stringsAsFactors = FALSE)
+ratings <- read.csv("https://raw.githubusercontent.com/maxwagner/643/master/ml-latest-small/ratings.csv", 
+                    stringsAsFactors = FALSE)
+
+ratings <- ratings[,-4]
+knitr::kable(head(movies))
+knitr::kable(head(ratings))
+```
+
+In partial thanks to Sreejaya Nair and Suman K Polavarapu for the cleaner way to get to a ratings matrix with $acast$.
+
+```{r}
+ratings_hori <- acast(ratings, userId ~ movieId, value.var="rating")
+ratings_rm <- as(ratings_hori, "realRatingMatrix")
+ratings_rm_r <- ratings_rm[, colCounts(ratings_rm) > 20]
+```
+
+We can compare what it looks like to use all ratings, versus a smaller subset of movies that have at least 20 ratings.
+
+```{r}
+par(mfrow=c(2,2))
+hist(rowMeans(ratings_rm), breaks = 100, col = "red", 
+     main = "User Ratings: full", xlab = "Ratings")
+
+hist(rowMeans(ratings_rm_r), breaks = 100, col = "red", 
+     main = "User Ratings: reduced", xlab = "Ratings")
+
+hist(colMeans(ratings_rm), breaks = 100, col = "yellow", 
+     main = "Movie Ratings: full", xlab = "Ratings")
+
+hist(colMeans(ratings_rm_r), breaks = 100, col = "yellow", 
+     main = "Movie Ratings: reduced", xlab = "Ratings")
+```
+
+The advantages of using a reduced version become much more clear with the histogram of the movie ratings. The first version, which shows all ratings, has obvious spikes on int values of 1, 2, 3, 4, and 5. This is likely from movies with low amount of ratings that have inflated results from what they actually should be rated. The second movie hisogram shows the reduced version, where only users/movies with above 20 ratings can be included. The curve is much more to what I had expected, with only a few major spikes, and more of a bell shape. Because of this, the reduced version is preferred.
+
+## UBCF Method
+
+As a baseline, we can try out some of the methods from the last few weeks before we try the matrix factorization methods. Train with the first 400 users, and then test on a few different users. We could then match the id's given to the movies they relate to. Each column is a user, and each row is the id of a suggested movie.
+
+```{r}
+movies.recom <- Recommender(ratings_rm_r[1:400], method = "UBCF")
+movies.predict <- predict(movies.recom, ratings_rm_r[c(500, 525, 600)],n=5)
+knitr::kable(as.data.frame(as(movies.predict, "list")))
+```
+
+## IBCF Method
+
+Very similar to the above, but with IBCF. IBCF takes significantly longer than UBCF to run.
+
+```{r}
+movies.recom <- Recommender(ratings_rm_r[1:400], method = "IBCF")
+movies.predict <- predict(movies.recom, ratings_rm_r[c(500, 525, 600)],n=5)
+knitr::kable(as.data.frame(as(movies.predict, "list")))
+```
+
+## Matrix Factorization Method
+
+Using SVD for the matrix factorization method. I decided to fill in 0's for values that were NA. Couldn't find a more elegant approach. One other option is filling in by row average (user average).
+
+```{r}
+ratings_rm_r <- normalize(ratings_rm_r)
+ratings_rm_r <- as(ratings_rm_r, "matrix")
+ratings_rm_r[is.na(ratings_rm_r)] <- 0
+ratings_svd <- svd(ratings_rm_r)
+```
+
+
+Estimating k from the SVD `d` value. Then reducing the `u` and `v` matrices based on the estimated k value. Because the matrix was already reduced once based on number of ratings, I do not expect it to reduced as much as the original matrix would have. And finally, create a matrix we can use to recommend things to users.
+
+```{r}
+d_cumul <- cumsum(ratings_svd$d) / sum(ratings_svd$d)
+k <- min(which(d_cumul >= 0.8));k
+
+d <- diag(sqrt(ratings_svd$d[1:k]))
+u <- ratings_svd$u[,1:k]
+v <- ratings_svd$v[1:k,]
+
+recom <- data.frame(u%*%d%*%v)
+colnames(recom) <- 1:668
+```
+
+Using `recom` we can then try to decide what kinds of movies a user likes by comparing them to other users.
+
+```{r}
+movie.recs <- data.frame(matrix(NA, nrow = 668, ncol = 668))
+for(i in 1:ncol(recom)) {
+   movie.recs[i,] <- colnames(recom[i,order(recom[i,],decreasing = TRUE)])
+}
+```
+
+For instance if we wanted to see the user that is most similar to userid 3, we can take the first value in the third row. And then look at the movies that user likes to watch. In this case, the user most similar to user 3 is user 335, so we can take user 335's favorite movies, and show them to user 3, in hopes they enjoy them. The number of suggestions and minimum ranking can be chosen if desired. 
+
+```{r}
+user3simi <- movie.recs[3,1]
+user.movies <- subset(ratings, userId == user3simi)
+user.best <- head(user.movies[order(-user.movies$rating),],3)
+user.best <- inner_join(user.best,movies,by = "movieId")
+user.best <- user.best[,4:5]
+knitr::kable(user.best)
+```
+
+There are other options, such as showing which genres a user likes the most. We can use user 3 again.
+
+```{r}
+user.movies <- subset(ratings, userId == 3 & rating >= 4)
+user.movies <- inner_join(user.movies,movies,by = "movieId")
+user.genres <- user.movies[,5]
+user.genres.split <- unlist(strsplit(user.genres, split = "|", fixed = TRUE))
+user.genres.count <- data.frame(table(user.genres.split))
+knitr::kable(head(user.genres.count[order(-user.genres.count$Freq),],5))
+```
+
+In this case, we can see that user 3 likes to watch dramas, comedies, romance, thrillers, and action movies. This could be accurate, but could also be an effect of the database itself. We can check the overall count in the movie database to see if the ranking is similar.
+
+```{r}
+movies.o <- movies[,3]
+genres.split <- unlist(strsplit(movies.o, split = "|", fixed = TRUE))
+genres.count <- data.frame(table(genres.split))
+knitr::kable(head(genres.count[order(-genres.count$Freq),],10))
+```
+
+If we take a look at the top genres in the whole database, we can see that the suggestions for user 3 and the overall collection end up very similar. It's an effect that should be taken into consideration when doing a content based system. Saying a user watches a lot of dramas or comedies, is not overly telling of what movies they might actually like. A more dividing system where comedies are split further into something like; romantic comedy, dark comedy, or silly comedy would be a much better indicator of what they might like. 
+
+## Citations
+
+http://econometricsense.blogspot.com/2012/10/nonnegative-matrix-factorization-and.html
+
+http://www.r-bloggers.com/using-the-svd-to-find-the-needle-in-the-haystack/
+
+https://github.com/srajeev1/MSDA-IS643/blob/master/projects/Project2/DATA643_Project_2.Rmd

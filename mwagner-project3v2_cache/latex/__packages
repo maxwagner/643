@@ -1,0 +1,13 @@
+base
+reshape2
+dplyr
+Matrix
+arules
+proxy
+registry
+recommenderlab
+pkgmaker
+rngtools
+cluster
+NMF
+ggplot2
