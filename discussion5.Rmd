@@ -1,0 +1,32 @@
+---
+title: "Discussion 5"
+author: "Max Wagner"
+date: "July 13, 2016"
+header-includes:
+   - \usepackage{bbm}
+output:
+  pdf_document: default
+  html_document:
+    highlight: espresso
+    theme: flatly
+  word_document: default
+---
+***
+
+## Music-Map
+
+[Music Map](http://www.music-map.com/)
+
+Music-map is a minimal site where you can type a music artist's name, and it will show you in a web other similar artists. For instance, when I type `tei shi` i get the following map. From the map, you can then click on other artists' names and it will take you to their web. It's also worth noting that within the large map, there are smaller clusters than form together into separate systems.
+
+![](http://puu.sh/q29Mq/9daae2b24d.png)
+
+![](http://puu.sh/q29XG/ced921de78.png =400x)
+
+Music, movies, books, etc. all lend themselves to be useful in a node network setting, rather than something like SQL. On a site like Music-map where it is completely user oriented, the appearance is more important than in a back-end setting like Netflix. Both function to recommend something, but one focuses on presenting it in a more visual manner. If the database itself is already abstract, it is much easier to translate that to the user.
+
+## How it works
+
+The site doesn't exactly explain how it works, but I can assume a few things. One is that the site gives an option to report errors and add new artists. Which means it is dynamic and isn't based on a static database in the back-end. The second is that you can click on other artists from the one you are currently on. It could record those clicks, and more closely relate the two artists. The node system is based on distance, which means as two artists become more commonly searched together, they become closer on the plot. Some artists also have significantly less similar artists than others. This could suggest that they are either unique, or they haven't been searched often. 
+
+The important thing about this setup is that it emphasizes the relationships between artists. There is no need to worry about how individual people rate the artist, just that they are similar. 
